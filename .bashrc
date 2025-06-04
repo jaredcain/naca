@@ -119,6 +119,4 @@ export WSLIBS="-L$HOME/basilisk/src/wsServer -lws"
 export LD_LIBRARY_PATH=$HOME/basilisk/src/wsServer:$LD_LIBRARY_PATH
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
-export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
 export LIBRARY_PATH=$LIBRARY_PATH:$HOME/basilisk/src
-export CC99='mpicc -std=c99'
