@@ -19,15 +19,9 @@ face vector muv[];
 
 #define chord   (1.)
 #define uref    (1.)
-#define nacaXXXX(x,y,a) (sq(y) - sq(5.0 * (a) \
-							   * (0.2969 * sqrt(x) \
-                               - 0.1260 * (x) \
-                               - 0.3516 * sq(x) \
-                               + 0.2843 * cube(x) \
-                               - 0.1015 * pow((x), 4.0))))
 
-coord ci = {0.5, 0}; // initial coordinates of airfoil
-coord cr = {0.25*chord, 0.}; // rotation center at quarter-chord
+coord ci = {0.5, 0};
+coord cr = {0.25*chord, 0.};
 
 void nacaset_f(const char* nacaset, double* mm, double* pp, double* tt)
 {
@@ -51,9 +45,9 @@ int main(int argc, char *argv[]) {
   freopen(log_filename, "w", stderr);
   
   L0 = 16.;
-  N = 1 << (maxlevel-2);
+  N = 1 << (maxlevel-4);
   origin (-L0/8, -L0/2.);
-  TOLERANCE = 1.e-4 [*];
+  TOLERANCE = 1.e-5 [*];
   mu = muv;
   
   run(); 
@@ -78,44 +72,10 @@ pf[right]  = dirichlet (0);
 u_x_ibm_dirichlet (0)
 u_y_ibm_dirichlet (0)
 
-/* void naca (scalar c, face vector f, double aoa, vertex scalar phii = {0})
-{
-  vertex scalar phi = automatic (phii);
-  foreach_vertex() {
-    double xx = cr.x + (x - ci.x)*cos (aoa) - (y - ci.y)*sin (aoa);
-    double yy = cr.y + (x - ci.x)*sin (aoa) + (y - ci.y)*cos (aoa);
-
-    if (xx >= 0. && xx <= 1.) {
-      double thetac = 0.;
-      if (xx < pp) {
-        yy -= mm / sq(pp) * (2. * pp * xx - sq(xx));
-        thetac = atan(2. * mm / sq(pp) * (pp - xx));
-      } else {
-        yy -= mm / sq(1. - pp) * (1. - 2. * pp + 2. * pp * xx - sq(xx));
-        thetac = atan(2. * mm / sq(1. - pp) * (pp - xx));
-      }
-
-      double yt = tt * cos(thetac);
-      phi[] = nacaXXXX(xx, yy, yt);
-
-      if (xx > 0.98) {
-        double d = xx - 0.98;
-        phi[] += 10. * d * d;
-      }
-    }
-    else {
-      phi[] = 1.;
-    }
-  }
-  boundary ({phi});
-  fractions (phi, c, f);
-} */
-
 void naca (scalar c, face vector f, double aoa, vertex scalar phii = {0})
 {
   vertex scalar phi = automatic (phii);
   foreach_vertex() {
-    // Rotate and translate grid points into airfoil coordinate system
     double xx = cr.x + (x - ci.x)*cos(aoa) - (y - ci.y)*sin(aoa);
     double yy = cr.y + (x - ci.x)*sin(aoa) + (y - ci.y)*cos(aoa);
 
@@ -123,7 +83,6 @@ void naca (scalar c, face vector f, double aoa, vertex scalar phii = {0})
     double yc = yy / chord;
 
     if (xc >= 0. && xc <= 1.) {
-      // Thickness distribution (from NACA 4-digit spec)
       double yt = 5.0 * tt * (
         0.2969 * sqrt(xc) -
         0.1260 * xc -
@@ -132,7 +91,6 @@ void naca (scalar c, face vector f, double aoa, vertex scalar phii = {0})
         0.1015 * pow(xc, 4.0)
       );
 
-      // Camber line and slope
       double yc_camber, dyc_dx;
       if (xc < pp && pp > 1e-6) {
         yc_camber = mm / sq(pp) * (2. * pp * xc - sq(xc));
@@ -171,7 +129,7 @@ event init (t = 0) {
 	foreach()
       ibm1[] = ibm[];
     ss = adapt_wavelet ({ibm1}, (double[]) {1.e-30},
-                        maxlevel, minlevel = maxlevel-2);
+                        maxlevel, minlevel = maxlevel-4);
   } while ((ss.nf || ss.nc) && ic < 100);
 
   naca (ibm, ibmf, aoa);
@@ -203,10 +161,17 @@ event snapshot (t += 5; t <= 30) {
   char fname[80];
   sprintf(fname, "snapshot_%.0f.png", t);
 
+  scalar omega_clean[];
+  foreach()
+    omega_clean[] = (ibm[] >= 1.) ? omega[] : nodata;
+  boundary({omega_clean});
+
+  stats om_masked = statsf(omega_clean);
+
   view (fov = 3, camera = "front", tx = -0.05, ty = 0., bg = {1,1,1},
         width = 3000, height = 3000);
   draw_vof ("ibm", "ibmf", filled = -1, lw = 3);
-  squares ("omega", linear = true, min = -1, max = 1);
+  squares (omega_clean, linear = true, min = om_masked.min, max = om_masked.max);
   save (fname);
 }
 
@@ -215,9 +180,12 @@ event adapt (i++) {
   foreach()
     ibmsf[] = vertex_average(point, ibm);
   adapt_wavelet ({ibmsf,u}, (double[]){1.e-15,3e-3,3e-3},
-                 maxlevel, minlevel = maxlevel-4);
+                 maxlevel, minlevel = maxlevel-6);
 }
 
+bool is_triple_point (Point point, coord nf, coord ns) {
+  return false;
+}
 bool is_triple_point (Point point, coord nf, coord ns) {
   return false;
 }
