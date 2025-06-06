@@ -120,6 +120,3 @@ export LD_LIBRARY_PATH=$HOME/basilisk/src/wsServer:$LD_LIBRARY_PATH
 export DISPLAY=:0
 export LIBGL_ALWAYS_INDIRECT=1
 export LIBRARY_PATH=$LIBRARY_PATH:$HOME/basilisk/src
-export CC99='mpicc -std=c99'
-export LDFLAGS="-lm $LDFLAGS"
-export CFLAGS="-Wall -O2 $CFLAGS"
