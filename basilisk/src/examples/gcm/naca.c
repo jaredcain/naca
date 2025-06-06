@@ -1,8 +1,3 @@
-// CC99='mpicc -std=c99' qcc -autolink -Wall -O2 -D_MPI=1 naca.c -o naca -lm -lfb_tiny
-// mpirun -np 4 ./naca <<NACA>> <<AoA>> <<Re>> <<LEVEL>>
-// tail -f 0012_2.log
-// http://basilisk.fr/three.js/editor/index.html?ws://COMECH-2065.ds.sc.edu:7100
-
 #include "ibm-gcm.h"
 #include "my-centered.h"
 #include "ibm-gcm-events.h"
@@ -117,26 +112,35 @@ event logfile (i++; t <= t_end) {
 
 event movies (t += framerate, t <= t_end) {
   view(fov = 1, tx = -0.05, width = 1920, height = 1080);
+  clear();
   draw_vof ("ibm", "ibmf", filled = -1);
   stats pr  = statsf(p);
   squares(color = "p", max = pr.max, min = pr.min); 
   cells();
-  char video[50];
-  snprintf(video, sizeof(video), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
-  save(video);
-}
-
-/* event movies (t += framerate, t <= t_end) {
-  view(quat = {0.0, 0.0, 0.0, 1.0}, fov = 30, near = 0.01, far = 1000, tx = -0.35, ty = 0.0, tz = -2.25, width = 1080, height = 1080);
+  char zoom[50];
+  snprintf(zoom, sizeof(zoom), "%s_%.0f_%.0f_%d_zoom.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(zoom);
+  clear();
+  view(fov = 21, tx = -0.3375, ty = 0.035, width = 1080, height = 1080);
   box();
-  cells();
   draw_vof ("ibm", "ibmf", filled = -1);
-  stats pr  = statsf(p);
-  squares(color = "p", max = pr.max, min = pr.min, cbar = true, border = true, pos = {0.4, 0.3}, label = "p", mid = true, format = " %0.1e", levels = 100, size = 20 , lw=1, fsize = 75); 
-  char video[50];
-  snprintf(video, sizeof(video), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
-  save(video);
-} */
+  squares(color = "p", 
+	max = pr.max, min = pr.min, 
+	cbar = true, 
+	border = true, 
+	pos = {0.65, 0.6}, 
+	label = "p", 
+	mid = true, 
+	format = " %0.3f", 
+	levels = 100, 
+	size = 30, 
+	lw=1, 
+	fsize = 100)
+	; 
+  char domain[50];
+  snprintf(domain, sizeof(domain), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(domain);
+}
 
 event adapt (i++) {
   scalar ibmsf[];
