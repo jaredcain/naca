@@ -1,8 +1,3 @@
-// CC99='mpicc -std=c99' qcc -autolink -Wall -O2 -D_MPI=1 naca.c -o naca -lm -lfb_tiny
-// mpirun -np 4 ./naca <<NACA>> <<AoA>> <<Re>> <<LEVEL>>
-// tail -f 0012_2.log
-// http://basilisk.fr/three.js/editor/index.html?ws://COMECH-2065.ds.sc.edu:7100
-
 #include "embed.h"
 #include "navier-stokes/centered.h"
 #include "view.h"
