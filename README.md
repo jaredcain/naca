@@ -1,4 +1,4 @@
-# NACA four-digit tool for collecting lift and drag coefficients and flow visualization
+# NACA four-digit tool for aerodynamic performance data, for use in basilisk
 Ensure you are using the bash file
 ```
 source ~/.bashrc
