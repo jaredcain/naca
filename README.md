@@ -3,6 +3,10 @@ Ensure you are using the bash file
 ```
 source ~/.bashrc
 ```
+Change to the proper directory, either the embed or gcm directory
+```
+cd ~/basilisk/src/examples/<embed or gcm>
+```
 Compile code in basilisk with MPI
 ```
 CC99='mpicc -std=c99' qcc -autolink -disable-dimensions -Wall -O2 -D_MPI=1 naca.c -o naca -lm
