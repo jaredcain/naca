@@ -1,4 +1,8 @@
 # NACA four-digit tool for collecting lift and drag coefficients and flow visualization
+Ensure you are using the bash file
+```
+source ~/.bashrc
+```
 Compile code in basilisk with MPI
 ```
 CC99='mpicc -std=c99' qcc -autolink -disable-dimensions -Wall -O2 -D_MPI=1 naca.c -o naca -lm
