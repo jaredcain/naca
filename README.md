@@ -24,7 +24,7 @@ In a separate command window you can see live logs by running
 ```
 tail -f <NACA>_<AoA>_<Re>_<LEVEL>.log
 ```
-So the previous example, you woudl run
+So the previous example, you would run
 ```
 tail -f 0012_2_10000_13.log
 ```
