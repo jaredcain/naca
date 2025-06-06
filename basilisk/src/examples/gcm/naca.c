@@ -9,19 +9,20 @@
 #include "view.h"
 
 double mm=0.0, pp=0.0, tt=0.12;
-double aoa = 0.0 * M_PI / 180.0;
+double aoa = 2.0 * M_PI / 180.0;
 double Re = 10000;
-int maxlevel = 12;
-int minlevel;
+int maxlevel = 13;
+int minlevel = 7;
 const char* nacaset="0012";
 const double t_end = 30;
+const double framerate = 1.0/25.0;
 const double chord = 1.0;
 const double uref = 1.0;
 const coord ci = {0.5, 0.0};
 const coord cr = {0.25*chord, 0.0};
 
 face vector muv[];
-scalar omega[];
+scalar omega[],m[];
 
 void nacaset_parse(const char* nacaset, double* mm, double* pp, double* tt) {
     *mm = (nacaset[0] - '0') * 0.01;
@@ -88,7 +89,6 @@ event properties (i++) {
 event init (t = 0) {
   scalar ibmr[];
   astats ss;
-  minlevel = maxlevel - 4;
   int ic = 0;
   do {
     ic++;
@@ -109,14 +109,37 @@ event logfile (i++; t <= t_end) {
   double CD = (Fp.x + Fmu.x)/(0.5*sq((uref))*(chord));
   double CL = (Fp.y + Fmu.y)/(0.5*sq((uref))*(chord));
   vorticity (u , omega);
-  stats om  = statsf(omega);
-  fprintf (stderr, "%d %g %g %g %g\n", i, t, om.max, CL, CD);
+  stats pr  = statsf(p);
+  stats ux = statsf(u.x);
+  fprintf (stderr, "%d %g %g %g %g %g %g\n", i, t, ux.max, CL, CD, pr.max, pr.min);
   fflush(stderr);
 }
 
+event movies (t += framerate, t <= t_end) {
+  view(fov = 1, tx = -0.05, width = 1920, height = 1080);
+  draw_vof ("ibm", "ibmf", filled = -1);
+  stats pr  = statsf(p);
+  squares(color = "p", max = pr.max, min = pr.min); 
+  cells();
+  char video[50];
+  snprintf(video, sizeof(video), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(video);
+}
+
+/* event movies (t += framerate, t <= t_end) {
+  view(quat = {0.0, 0.0, 0.0, 1.0}, fov = 30, near = 0.01, far = 1000, tx = -0.35, ty = 0.0, tz = -2.25, width = 1080, height = 1080);
+  box();
+  cells();
+  draw_vof ("ibm", "ibmf", filled = -1);
+  stats pr  = statsf(p);
+  squares(color = "p", max = pr.max, min = pr.min, cbar = true, border = true, pos = {0.4, 0.3}, label = "p", mid = true, format = " %0.1e", levels = 100, size = 20 , lw=1, fsize = 75); 
+  char video[50];
+  snprintf(video, sizeof(video), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(video);
+} */
+
 event adapt (i++) {
   scalar ibmsf[];
-  minlevel = maxlevel - 4;
   foreach()
     ibmsf[] = vertex_average(point, ibm);
   adapt_wavelet ({ibmsf,u}, (double[]){1.e-15,3e-3,3e-3}, maxlevel, minlevel);
@@ -134,9 +157,9 @@ int main(int argc, char *argv[]) {
   snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
   freopen(log_filename, "w", stderr);
   L0 = 16.;
-  N = 1 << (maxlevel-4);
+  N = 1 << (maxlevel-6);
   origin (-L0/8, -L0/2.);
-  TOLERANCE = 1.e-5;
+  TOLERANCE = 1.e-6;
   mu = muv;
   run(); 
 }
