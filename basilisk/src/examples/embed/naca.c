@@ -39,8 +39,8 @@ int main(int argc, char *argv[]) {
   
   L0 = 16.;
   origin (-L0/8, -L0/2.);
-  N = 1 << (maxlevel-1);
-  TOLERANCE = 1.e-4 [*];
+  N = 1 << (maxlevel-4);
+  TOLERANCE = 1.e-6;
   mu = muv;
   
   run(); 
@@ -107,7 +107,7 @@ event init (t = 0) {
     foreach()
       csf[] = cs[];
     ss = adapt_wavelet ({csf}, (double[]) {1.e-30},
-			maxlevel, minlevel = (maxlevel-1));
+			maxlevel, minlevel = (maxlevel-4));
   } while ((ss.nf || ss.nc) && ic < 100);
   solid (cs, fs, naca(x, y, mm, pp, tt));
   foreach()
@@ -133,30 +133,6 @@ event logfile (i++; t <= t_end) {
   fflush(stderr);
 }
 
-#if = 0
-
-event movies (t += 0.05; t <= t_end)
-{
-  scalar omega[],m[];
-  vorticity(u, omega);
-  view(quat = {0.000, 0.000, 0.000, 1.000}, fov = 30, near = 0.01, far = 1000, tx = -0.0, ty = 0.05, tz = -2.25, width = 512, height = 512);
-  box();
-  squares(color = "omega"); //for some reason freaks out and is a color bomb without this one
-  squares(color = "omega", spread = -1, cbar = true, border = true, pos = {-0.725, 0.4}, mid = true, format = " %.0f", levels = 100, size = 17 , lw=1, fsize = 75);
-  //cells();
-  draw_vof(c="cs",lw=1, lc = {0,0,0});
-  foreach()
-    m[] = cs[] - 0.5;
-  char zoom[50];
-  snprintf(zoom, sizeof(zoom), "%s_%.0f_zoom.mp4", nacaset, aoa * 180.0 / M_PI);
-  output_ppm (omega, file = zoom, box = {{-1,-1},{4,1}}, min = -10, max = 10, linear = true, mask = m);
-  char video[50];
-  snprintf(video, sizeof(video), "%s_%.0f.mp4", nacaset, aoa * 180.0 / M_PI);
-  save(video);
-}
-
-#endif
-
 event adapt (i++) {
-  adapt_wavelet ({cs,u}, (double[]){1e-15,1e-3,1e-3}, maxlevel, 7);
+  adapt_wavelet ({cs,u}, (double[]){1e-15,3e-3,3e-3}, maxlevel, 7);
 }
