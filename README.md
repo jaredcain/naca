@@ -28,9 +28,3 @@ So the previous example, you would run
 ```
 tail -f 0012_2_10000_13.log
 ```
-
-https://github.com/user-attachments/assets/c79bea8e-be1e-456c-9ec0-eccc0cb3be99
-
-https://github.com/user-attachments/assets/a9d47909-cdf3-4918-880c-345e89cd7528
-
-[0012_2_10000_13.log](https://github.com/user-attachments/files/20657099/0012_2_10000_13.log)
