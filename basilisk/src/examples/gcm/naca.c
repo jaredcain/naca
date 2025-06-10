@@ -3,61 +3,51 @@
 #include "ibm-gcm-events.h"
 #include "view.h"
 
-double mm=0.0, pp=0.0, tt=0.12;
-double aoa = 2.0 * M_PI / 180.0;
+double mm = 0.0, pp = 0.0, tt = 0.12;
+double aoa = 2.0*M_PI/180.0;
 double Re = 10000;
-int maxlevel = 13;
-int minlevel = 7;
+double t_end = 30;
+int maxlevel = 13, minlevel = 7;
 const char* nacaset="0012";
-const double t_end = 30;
 const double framerate = 1.0/25.0;
 const double chord = 1.0;
 const double uref = 1.0;
-const coord ci = {0.5, 0.0};
-const coord cr = {0.25*chord, 0.0};
+const coord cr = {0.25, 0.0};
 
 face vector muv[];
-scalar omega[],m[];
+scalar omega[],m[],f[];
 
-void nacaset_parse(const char* nacaset, double* mm, double* pp, double* tt) {
-    *mm = (nacaset[0] - '0') * 0.01;
-    *pp = (nacaset[1] - '0') * 0.1;
-    *tt = ((nacaset[2] - '0') * 10 + (nacaset[3] - '0')) * 0.01;
+void nacaset_parse (const char* nacaset, double* mm, double* pp, double* tt) {
+  *mm = (nacaset[0]-'0')*0.01;
+  *pp = (nacaset[1]-'0')*0.1;
+  *tt = ((nacaset[2]-'0')*10+(nacaset[3]-'0'))*0.01;
 }
 
 void naca (scalar c, face vector f, double aoa, vertex scalar phii = {0}) {
   vertex scalar phi = automatic (phii);
   foreach_vertex() {
-    double xx = cr.x + (x - ci.x)*cos(aoa) - (y - ci.y)*sin(aoa);
-    double yy = cr.y + (x - ci.x)*sin(aoa) + (y - ci.y)*cos(aoa);
-    double xc = clamp(xx / chord, 0., 1.);
-    double yc = yy / chord;
-    if (xc >= 0. && xc <= 1.) {
-      double yt = 5.0 * tt * (
-        0.2969 * sqrt(xc) -
-        0.1260 * xc -
-        0.3516 * sq(xc) +
-        0.2843 * cube(xc) -
-        0.1015 * pow(xc, 4.0));
-      double yc_camber, dyc_dx;
-      if (xc < pp && pp > 1e-6) {
-        yc_camber = mm / sq(pp) * (2. * pp * xc - sq(xc));
-        dyc_dx = 2. * mm / sq(pp) * (pp - xc);
-      } else if (pp < 1.0 - 1e-6) {
-        yc_camber = mm / sq(1. - pp) * (1. - 2. * pp + 2. * pp * xc - sq(xc));
-        dyc_dx = 2. * mm / sq(1. - pp) * (pp - xc);
+    double xx = (x-cr.x)*cos(aoa)-(y-cr.y)*sin(aoa)+cr.x;
+    double yy = (x-cr.x)*sin(aoa)+(y-cr.y)*cos(aoa)+cr.y;
+    double xc = xx/chord;
+    double yc = yy/chord;
+    if (xc >= 0.0 && xc <= 1.0) {
+      double yt = 5.0*tt*(0.2969*sqrt(xc)-0.1260*xc-0.3516*sq(xc)+0.2843*cube(xc)-0.1015*pow(xc, 4.0));
+      double yc_camber;
+      if (pp == 0.0) {
+        yc_camber = 0.0;
+      } else if (xc < pp) {
+        yc_camber = mm/sq(pp)*(2.0*pp*xc-sq(xc));
       } else {
-        yc_camber = 0.;
-        dyc_dx = 0.;
+        yc_camber = mm/sq(1.0 - pp)*(1.0-2.0*pp+2.0*pp*xc-sq(xc));
       }
-      phi[] = sq(yc - yc_camber) - sq(yt);
+      phi[] = sq(yc-yc_camber)-sq(yt);
       if (xc > 0.98) {
-        double d = xc - 0.98;
-        phi[] += 10. * d * d;
+        double d = xc-0.98;
+        phi[] += 10.0*d*d;
       }
     }
     else {
-      phi[] = 1.;
+      phi[] = 1.0;
     }
   }
   boundary ({phi});
@@ -98,48 +88,20 @@ event init (t = 0) {
   boundary((scalar *){u});
 }
 
-event logfile (i++; t <= t_end) {
+event output (t += framerate; t <= t_end) {
   coord Fp, Fmu;
   ibm_force (p, u, mu, &Fp, &Fmu);
-  double CD = (Fp.x + Fmu.x)/(0.5*sq((uref))*(chord));
-  double CL = (Fp.y + Fmu.y)/(0.5*sq((uref))*(chord));
-  vorticity (u , omega);
+  double CD = (Fp.x+Fmu.x)/(0.5*sq((uref))*(chord));
+  double CL = (Fp.y+Fmu.y)/(0.5*sq((uref))*(chord));
+  vorticity (u, omega);
   stats pr  = statsf(p);
   stats ux = statsf(u.x);
   fprintf (stderr, "%d %g %g %g %g %g %g\n", i, t, ux.max, CL, CD, pr.max, pr.min);
   fflush(stderr);
-}
-
-event movies (t += framerate, t <= t_end) {
-  view(fov = 1, tx = -0.05, width = 1920, height = 1080);
-  clear();
-  draw_vof ("ibm", "ibmf", filled = -1);
-  stats pr  = statsf(p);
-  squares(color = "p", max = pr.max, min = pr.min); 
-  cells();
-  char zoom[50];
-  snprintf(zoom, sizeof(zoom), "%s_%.0f_%.0f_%d_zoom.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
-  save(zoom);
-  clear();
-  view(fov = 21, tx = -0.3375, ty = 0.035, width = 1080, height = 1080);
-  box();
-  draw_vof ("ibm", "ibmf", filled = -1);
-  squares(color = "p", 
-	max = pr.max, min = pr.min, 
-	cbar = true, 
-	border = true, 
-	pos = {0.65, 0.6}, 
-	label = "p", 
-	mid = true, 
-	format = " %0.3f", 
-	levels = 100, 
-	size = 30, 
-	lw=1, 
-	fsize = 100)
-	; 
-  char domain[50];
-  snprintf(domain, sizeof(domain), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
-  save(domain);
+  scalar * dumplist = {u,p,f,ibm,omega};
+  char dumpfile[50];
+  sprintf(dumpfile, "dump/%s_%.0f_%.0f_%d_%.3f_dump", nacaset, aoa * 180.0 / M_PI, Re, maxlevel, t);
+  dump (file = dumpfile, list = dumplist);
 }
 
 event adapt (i++) {
@@ -149,21 +111,22 @@ event adapt (i++) {
   adapt_wavelet ({ibmsf,u}, (double[]){1.e-15,3e-3,3e-3}, maxlevel, minlevel);
 }
 
-int main(int argc, char *argv[]) {
+int main (int argc, char *argv[]) {
   if (argc > 1) {
     nacaset = argv[1];
-    if (argc > 2) aoa = atof(argv[2]) * M_PI / 180.0;
+    if (argc > 2) aoa = atof(argv[2])*M_PI/180.0;
     if (argc > 3) Re = atof(argv[3]);
     if (argc > 4) maxlevel = atoi(argv[4]);
+	if (argc > 5) t_end = atof(argv[5]);
   }
-  nacaset_parse(nacaset, &mm, &pp, &tt);
+  nacaset_parse (nacaset, &mm, &pp, &tt);
   char log_filename[50];
-  snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
-  freopen(log_filename, "w", stderr);
-  L0 = 16.;
-  N = 1 << (maxlevel-6);
-  origin (-L0/8, -L0/2.);
-  TOLERANCE = 1.e-6;
+  snprintf (log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  freopen (log_filename, "w", stderr);
+  L0 = 16;
+  N = 1 << (minlevel);
+  origin (-L0/8, -L0/2);
+  TOLERANCE = 1e-6;
   mu = muv;
-  run(); 
+  run();
 }
