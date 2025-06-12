@@ -1,6 +1,7 @@
 #include "ibm-gcm.h"
 #include "my-centered.h"
 #include "ibm-gcm-events.h"
+#include "trailingcap.h"
 #include "view.h"
 
 double mm = 0.0, pp = 0.0, tt = 0.12;
@@ -24,27 +25,24 @@ void nacaset_parse (const char* nacaset, double* mm, double* pp, double* tt) {
 }
 
 void naca (scalar c, face vector f, double aoa, vertex scalar phii = {0}) {
+  int i = (int)((tt - 0.01) / 0.01);
+  double cap = cap_vals[i];
+  double te  = r_vals[i];
   vertex scalar phi = automatic (phii);
   foreach_vertex() {
-    double xx = (x-cr.x)*cos(aoa)-(y-cr.y)*sin(aoa)+cr.x;
-    double yy = (x-cr.x)*sin(aoa)+(y-cr.y)*cos(aoa)+cr.y;
-    double xc = xx/chord;
-    double yc = yy/chord;
-    if (xc >= 0.0 && xc <= 1.0) {
-      double yt = 5.0*tt*(0.2969*sqrt(xc)-0.1260*xc-0.3516*sq(xc)+0.2843*cube(xc)-0.1015*pow(xc, 4.0));
-      double yc_camber;
-      if (pp == 0.0) {
-        yc_camber = 0.0;
-      } else if (xc < pp) {
-        yc_camber = mm/sq(pp)*(2.0*pp*xc-sq(xc));
-      } else {
-        yc_camber = mm/sq(1.0 - pp)*(1.0-2.0*pp+2.0*pp*xc-sq(xc));
+    double xx = ((x-cr.x)*cos(aoa)-(y-cr.y)*sin(aoa)+cr.x)/chord;
+    double yy = ((x-cr.x)*sin(aoa)+(y-cr.y)*cos(aoa)+cr.y)/chord;     
+    if (xx >= 0.0 && xx <= 1.0) {     
+      double yt = 5.0*tt*(0.2969*sqrt(xx)-0.1260*xx-0.3516*sq(xx)+0.2843*cube(xx)-0.1015*pow(xx, 4.0));
+      double yc;
+      if (xx >= cap) {
+          yt = sqrt(fmax(0.0, sq(te) - sq(xx - (1 - te))));
       }
-      phi[] = sq(yc-yc_camber)-sq(yt);
-      if (xc > 0.98) {
-        double d = xc-0.98;
-        phi[] += 10.0*d*d;
-      }
+      if (xx < pp)
+        yc = mm/sq(pp)*(2.0*pp*xx - sq(xx));
+      else
+        yc = mm/sq(1.0 - pp)*(1.0 - 2.0*pp + 2.0*pp*xx - sq(xx));
+      phi[] = sq(yy - yc) - sq(yt);
     }
     else {
       phi[] = 1.0;
@@ -88,7 +86,7 @@ event init (t = 0) {
   boundary((scalar *){u});
 }
 
-event output (t += framerate; t <= t_end) {
+event output (i++ ; t <= t_end) {
   coord Fp, Fmu;
   ibm_force (p, u, mu, &Fp, &Fmu);
   double CD = (Fp.x+Fmu.x)/(0.5*sq((uref))*(chord));
@@ -98,6 +96,9 @@ event output (t += framerate; t <= t_end) {
   stats ux = statsf(u.x);
   fprintf (stderr, "%d %g %g %g %g %g %g\n", i, t, ux.max, CL, CD, pr.max, pr.min);
   fflush(stderr);
+}
+
+event dumpfile (t += framerate ; t <= t_end) {
   scalar * dumplist = {u,p,f,ibm,omega};
   char dumpfile[50];
   sprintf(dumpfile, "dump/%s_%.0f_%.0f_%d_%.3f_dump", nacaset, aoa * 180.0 / M_PI, Re, maxlevel, t);
