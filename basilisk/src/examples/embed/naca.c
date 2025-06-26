@@ -1,20 +1,20 @@
 #include "embed.h"
 #include "navier-stokes/centered.h"
+#include "trailingcap.h"
 #include "view.h"
 
 double mm=0., pp=0., tt=0.12; // camber,location,thickness
 double Reynolds = 10000;
 double aoa = 2. * M_PI / 180.0;
 const double t_end = 30;
-
+const double chord = 1.0;
+const double uref = 1.0;
 const char* nacaset="0012";
 int maxlevel = 13;
-face vector muv[];
+int minlevel = 7;
+const coord cr = {0.25, 0.0};
 
-#define chord   (1.)
-#define uref    (1.)
-#define tref    ((chord)/(uref))
-#define naca00xx(x,y,a) (sq(y) - sq(5.*(a)*(0.2969*sqrt((x)) - 0.1260*((x)) - 0.3516*sq((x)) + 0.2843*cube((x)) - 0.1015*pow((x), 4.))))
+face vector muv[];
 
 void nacaset_f(const char* nacaset, double* mm, double* pp, double* tt)
 {
@@ -23,33 +23,27 @@ void nacaset_f(const char* nacaset, double* mm, double* pp, double* tt)
     *tt = ((nacaset[2] - '0') * 10 + (nacaset[3] - '0')) * 0.01;
 }
 
-int main(int argc, char *argv[]) {
-  if (argc > 1) {
-    nacaset = argv[1];
-    if (argc > 2) aoa = atof(argv[2]) * M_PI / 180.0;
-    if (argc > 3) Reynolds = atof(argv[3]);
-    if (argc > 4) maxlevel = atoi(argv[4]);
+double naca(double x, double y, double mm, double pp, double tt) {
+  int i = (int)((tt - 0.01) / 0.01);
+  double cap = cap_vals[i];
+  double te  = r_vals[i];
+  double xx = ((x-cr.x)*cos(aoa)-(y-cr.y)*sin(aoa)+cr.x)/chord;
+  double yy = ((x-cr.x)*sin(aoa)+(y-cr.y)*cos(aoa)+cr.y)/chord;     
+  if (xx >= 0.0 && xx <= 1.0) {     
+    double yt = 5.0*tt*(0.2969*sqrt(xx)-0.1260*xx-0.3516*sq(xx)+0.2843*cube(xx)-0.1015*pow(xx, 4.0));
+    double yc;
+    if (xx >= cap) {
+        yt = sqrt(fmax(0.0, sq(te) - sq(xx - (1 - te))));
+    }
+    if (xx < pp)
+      yc = mm/sq(pp)*(2.0*pp*xx - sq(xx));
+    else
+      yc = mm/sq(1.0 - pp)*(1.0 - 2.0*pp + 2.0*pp*xx - sq(xx));
+    return sq(yy - yc) - sq(yt);
+    }
+  else {
+    return 1.0;
   }
-  
-  nacaset_f(nacaset, &mm, &pp, &tt);
-  
-  char log_filename[50];
-  snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Reynolds, maxlevel);
-  freopen(log_filename, "w", stderr);
-  
-  L0 = 16.;
-  origin (-L0/8, -L0/2.);
-  N = 1 << (maxlevel-4);
-  TOLERANCE = 1.e-6;
-  mu = muv;
-  
-  run(); 
-}
-
-event properties (i++)
-{
-  foreach_face()
-    muv.x[] = fm.x[]/Reynolds;
 }
 
 u.n[left]  = dirichlet(1);
@@ -63,38 +57,10 @@ pf[right]  = dirichlet(0);
 u.n[embed] = dirichlet(0);
 u.t[embed] = dirichlet(0);
 
-double naca(double x, double y, double mm, double pp, double tt)
+event properties (i++)
 {
-  if (x >= 0. && x <= chord) {
-    double xr = x * cos(aoa) - y * sin(aoa);
-    double yr = x * sin(aoa) + y * cos(aoa);
-    double xc = xr / chord;
-    double yc = yr / chord;
-
-    if (xc < 0.) xc = 0.;
-    if (xc > chord) xc = chord;
-
-    double thetac = 0.;
-    if (xc < pp) {
-      yc -= mm / sq(pp) * (2. * pp * xc - sq(xc));
-      thetac = atan(2. * mm / sq(pp) * (pp - xc));
-    } else {
-      yc -= mm / sq(1. - pp) * (1. - 2. * pp + 2. * pp * xc - sq(xc));
-      thetac = atan(2. * mm / sq(1. - pp) * (pp - xc));
-    }
-
-    double geometry = naca00xx(xc, yc, tt * cos(thetac));
-
-    if (xc > 0.98) {
-      double d = xc - 0.98;
-      geometry += 10. * d * d;
-    }
-
-    return geometry;
-  }
-  else {
-    return 1.;
-  }
+  foreach_face()
+    muv.x[] = fm.x[]/Reynolds;
 }
 
 event init (t = 0) {
@@ -106,8 +72,7 @@ event init (t = 0) {
     solid (cs, fs, naca(x, y, mm, pp, tt));
     foreach()
       csf[] = cs[];
-    ss = adapt_wavelet ({csf}, (double[]) {1.e-30},
-			maxlevel, minlevel = (maxlevel-4));
+    ss = adapt_wavelet ({csf}, (double[]) {1.e-30}, maxlevel, minlevel);
   } while ((ss.nf || ss.nc) && ic < 100);
   solid (cs, fs, naca(x, y, mm, pp, tt));
   foreach()
@@ -134,5 +99,28 @@ event logfile (i++; t <= t_end) {
 }
 
 event adapt (i++) {
-  adapt_wavelet ({cs,u}, (double[]){1e-15,3e-3,3e-3}, maxlevel, 7);
+  adapt_wavelet ({cs,u}, (double[]){1e-15,3e-3,3e-3}, maxlevel, minlevel);
+}
+
+int main(int argc, char *argv[]) {
+  if (argc > 1) {
+    nacaset = argv[1];
+    if (argc > 2) aoa = atof(argv[2]) * M_PI / 180.0;
+    if (argc > 3) Reynolds = atof(argv[3]);
+    if (argc > 4) maxlevel = atoi(argv[4]);
+  }
+  
+  nacaset_f(nacaset, &mm, &pp, &tt);
+  
+  char log_filename[50];
+  snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Reynolds, maxlevel);
+  freopen(log_filename, "w", stderr);
+  
+  L0 = 16.;
+  origin (-L0/8, -L0/2.);
+  N = 1 << minlevel;
+  TOLERANCE = 1.e-6;
+  mu = muv;
+  
+  run(); 
 }
