@@ -4,7 +4,7 @@
 #include "view.h"
 
 double mm=0., pp=0., tt=0.12;
-double Reynolds = 10000;
+double Re = 10000;
 double aoa = 2. * M_PI / 180.0;
 const double t_end = 30;
 const double chord = 1.0;
@@ -16,8 +16,7 @@ const coord cr = {0.25, 0.0};
 
 face vector muv[];
 
-void nacaset_f(const char* nacaset, double* mm, double* pp, double* tt)
-{
+void nacaset_f(const char* nacaset, double* mm, double* pp, double* tt) {
     *mm = (nacaset[0] - '0') * 0.01;
     *pp = (nacaset[1] - '0') * 0.1;
     *tt = ((nacaset[2] - '0') * 10 + (nacaset[3] - '0')) * 0.01;
@@ -60,7 +59,7 @@ u.t[embed] = dirichlet(0);
 event properties (i++)
 {
   foreach_face()
-    muv.x[] = fm.x[]/Reynolds;
+    muv.x[] = fm.x[]/Re;
 }
 
 event init (t = 0) {
@@ -94,6 +93,38 @@ event logfile (i++; t <= t_end) {
   fflush(stderr);
 }
 
+event movies (t += framerate, t <= t_end) {
+  view(fov = 1, tx = -0.025, width = 1920, height = 1080);
+  clear();
+  draw_vof ("cs", "fs", filled = -1);
+  stats pr  = statsf(p);
+  squares(color = "p", max = pr.max, min = pr.min); 
+  cells();
+  char zoom[50];
+  snprintf(zoom, sizeof(zoom), "%s_%.0f_%.0f_%d_zoom.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(zoom);
+  clear();
+  view(fov = 21, tx = -0.3375, ty = 0.035, width = 1080, height = 1080);
+  box();
+  draw_vof ("cs", "fs", filled = -1);
+  squares(color = "p", 
+	max = pr.max, min = pr.min, 
+	cbar = true, 
+	border = true, 
+	pos = {0.65, 0.6}, 
+	label = "p", 
+	mid = true, 
+	format = " %0.3f", 
+	levels = 100, 
+	size = 30, 
+	lw=1, 
+	fsize = 100)
+	; 
+  char domain[50];
+  snprintf(domain, sizeof(domain), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(domain);
+}
+
 event adapt (i++) {
   adapt_wavelet ({cs,u}, (double[]){1e-15,3e-3,3e-3}, maxlevel, minlevel);
 }
@@ -102,12 +133,12 @@ int main(int argc, char *argv[]) {
   if (argc > 1) {
     nacaset = argv[1];
     if (argc > 2) aoa = atof(argv[2]) * M_PI / 180.0;
-    if (argc > 3) Reynolds = atof(argv[3]);
+    if (argc > 3) Re = atof(argv[3]);
     if (argc > 4) maxlevel = atoi(argv[4]);
   }
   nacaset_f(nacaset, &mm, &pp, &tt);
   char log_filename[50];
-  snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Reynolds, maxlevel);
+  snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
   freopen(log_filename, "w", stderr);
   L0 = 16.;
   origin (-L0/8, -L0/2.);
