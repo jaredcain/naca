@@ -3,7 +3,7 @@
 #include "trailingcap.h"
 #include "view.h"
 
-double mm=0., pp=0., tt=0.12; // camber,location,thickness
+double mm=0., pp=0., tt=0.12;
 double Reynolds = 10000;
 double aoa = 2. * M_PI / 180.0;
 const double t_end = 30;
@@ -83,16 +83,12 @@ event logfile (i++; t <= t_end) {
   scalar omega[];
   vorticity (u,omega);
   face vector muv[];
-  
   foreach()
-    omega[] = cs[] < 1. ? nodata : fabs(omega[]);
-	
+    omega[] = cs[] < 1. ? nodata : omega[];
   coord Fp, Fmu;
   embed_force (p, u, mu, &Fp, &Fmu);
-
   double CD = (Fp.x + Fmu.x)/(0.5*sq((uref))*(chord));
   double CL = (Fp.y + Fmu.y)/(0.5*sq((uref))*(chord));
-  
   stats om  = statsf(omega);
   fprintf (stderr, "%d %g %g %g %g\n", i, t, om.max, CL, CD);
   fflush(stderr);
@@ -109,18 +105,14 @@ int main(int argc, char *argv[]) {
     if (argc > 3) Reynolds = atof(argv[3]);
     if (argc > 4) maxlevel = atoi(argv[4]);
   }
-  
   nacaset_f(nacaset, &mm, &pp, &tt);
-  
   char log_filename[50];
   snprintf(log_filename, sizeof(log_filename), "%s_%.0f_%.0f_%d.log", nacaset, aoa * 180.0 / M_PI, Reynolds, maxlevel);
   freopen(log_filename, "w", stderr);
-  
   L0 = 16.;
   origin (-L0/8, -L0/2.);
   N = 1 << minlevel;
   TOLERANCE = 1.e-6;
   mu = muv;
-  
   run(); 
 }
