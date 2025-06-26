@@ -87,22 +87,50 @@ event init (t = 0) {
 }
 
 event output (i++ ; t <= t_end) {
+  foreach()
+    omega[] = ibm[] < 1. ? nodata : fabs(omega[]);
   coord Fp, Fmu;
   ibm_force (p, u, mu, &Fp, &Fmu);
   double CD = (Fp.x+Fmu.x)/(0.5*sq((uref))*(chord));
   double CL = (Fp.y+Fmu.y)/(0.5*sq((uref))*(chord));
   vorticity (u, omega);
+  stats om  = statsf(omega);
   stats pr  = statsf(p);
   stats ux = statsf(u.x);
-  fprintf (stderr, "%d %g %g %g %g %g %g\n", i, t, ux.max, CL, CD, pr.max, pr.min);
+  fprintf (stderr, "%d %g %g %g %g %g %g\n", i, t, om.max, CL, CD, ux.max, pr.max, pr.min);
   fflush(stderr);
 }
 
-event dumpfile (t += framerate ; t <= t_end) {
-  scalar * dumplist = {u,p,f,ibm,omega};
-  char dumpfile[50];
-  sprintf(dumpfile, "dump/%s_%.0f_%.0f_%d_%.3f_dump", nacaset, aoa * 180.0 / M_PI, Re, maxlevel, t);
-  dump (file = dumpfile, list = dumplist);
+event movies (t += framerate, t <= t_end) {
+  view(fov = 1, tx = -0.025, width = 1920, height = 1080);
+  clear();
+  draw_vof ("ibm", "ibmf", filled = -1);
+  stats pr  = statsf(p);
+  squares(color = "p", max = pr.max, min = pr.min); 
+  cells();
+  char zoom[50];
+  snprintf(zoom, sizeof(zoom), "%s_%.0f_%.0f_%d_zoom.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(zoom);
+  clear();
+  view(fov = 21, tx = -0.3375, ty = 0.035, width = 1080, height = 1080);
+  box();
+  draw_vof ("ibm", "ibmf", filled = -1);
+  squares(color = "p", 
+	max = pr.max, min = pr.min, 
+	cbar = true, 
+	border = true, 
+	pos = {0.65, 0.6}, 
+	label = "p", 
+	mid = true, 
+	format = " %0.3f", 
+	levels = 100, 
+	size = 30, 
+	lw=1, 
+	fsize = 100)
+	; 
+  char domain[50];
+  snprintf(domain, sizeof(domain), "%s_%.0f_%.0f_%d.mp4", nacaset, aoa * 180.0 / M_PI, Re, maxlevel);
+  save(domain);
 }
 
 event adapt (i++) {
